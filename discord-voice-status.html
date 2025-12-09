@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Voice Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .header h1 {
+            color: #5865F2;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-connected {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-disconnected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-dot-badge {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-green {
+            background: #10b981;
+        }
+
+        .dot-red {
+            background: #ef4444;
+        }
+
+        .refresh-btn {
+            background: #5865F2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #4752C4;
+        }
+
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .guild-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .guild-tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #f3f4f6;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .guild-tab:hover {
+            background: #e5e7eb;
+        }
+
+        .guild-tab.active {
+            background: #5865F2;
+            color: white;
+            border-color: #5865F2;
+        }
+
+        .guild-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .guild-icon-placeholder {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .guild-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .guild-members {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .guild-tab.active .guild-members {
+            opacity: 0.9;
+        }
+
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .channel-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .channel-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .channel-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .channel-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c2f33;
+        }
+
+        .member-count {
+            margin-left: auto;
+            background: #5865F2;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .members-list {
+            list-style: none;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+
+        .member-item:hover {
+            background: #f7f7f7;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin-right: 10px;
+            object-fit: cover;
+        }
+
+        .avatar-placeholder {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin-right: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .member-info {
+            flex: 1;
+        }
+
+        .member-name {
+            font-weight: 500;
+            color: #2c2f33;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #666;
+            flex-wrap: wrap;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-muted {
+            background: #f04747;
+        }
+
+        .status-deafened {
+            background: #737f8d;
+        }
+
+        .status-normal {
+            background: #43b581;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .empty-channel {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .error-banner {
+            background: #fee2e2;
+            border: 1px solid #f87171;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #991b1b;
+        }
+
+        .error-banner strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 18px;
+        }
+
+        .last-update {
+            font-size: 12px;
+            color: white;
+            text-align: center;
+            margin-top: 20px;
+            opacity: 0.8;
+        }
+
+        .view-all-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .view-all-btn:hover {
+            background: #059669;
+        }
+
+        .view-all-btn.active {
+            background: #5865F2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <h1>
+                    <span class="channel-icon">🎮</span>
+                    <span>Discord Voice Status</span>
+                </h1>
+                <div class="header-controls">
+                    <div id="statusBadge" class="status-badge status-disconnected">
+                        <span class="status-dot-badge dot-red"></span>
+                        Connecting...
+                    </div>
+                    <button class="refresh-btn" onclick="refreshData()" id="refreshBtn">🔄 Refresh</button>
+                </div>
+            </div>
+            <div class="guild-selector" id="guildSelector">
+                <div class="loading">Loading guilds...</div>
+            </div>
+        </div>
+
+        <div id="errorContainer"></div>
+        <div class="channels-grid" id="channelsContainer">
+            <div class="loading">Select a guild to view voice channels...</div>
+        </div>
+        <div class="last-update" id="lastUpdate"></div>
+    </div>
+
+    <script>
+        // Configure your backend API URL here
+        const API_URL = 'http://localhost:3000/api';
+        let isRefreshing = false;
+        let guilds = [];
+        let selectedGuildId = 'all';
+
+        function getInitials(name) {
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        function getStatusText(member) {
+            const statuses = [];
+            if (member.deafened) statuses.push('Deafened');
+            if (member.muted) statuses.push('Muted');
+            if (member.streaming) statuses.push('Streaming');
+            if (member.video) statuses.push('Video');
+            if (statuses.length === 0) statuses.push('Connected');
+            return statuses.join(', ');
+        }
+
+        function getStatusClass(member) {
+            if (member.deafened) return 'status-deafened';
+            if (member.muted) return 'status-muted';
+            return 'status-normal';
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `
+                <div class="error-banner">
+                    <strong>Connection Error</strong>
+                    ${message}
+                </div>
+            `;
+        }
+
+        function clearError() {
+            document.getElementById('errorContainer').innerHTML = '';
+        }
+
+        function updateStatus(connected) {
+            const badge = document.getElementById('statusBadge');
+            if (connected) {
+                badge.className = 'status-badge status-connected';
+                badge.innerHTML = '<span class="status-dot-badge dot-green"></span>Connected';
+            } else {
+                badge.className = 'status-badge status-disconnected';
+                badge.innerHTML = '<span class="status-dot-badge dot-red"></span>Disconnected';
+            }
+        }
+
+        async function fetchGuilds() {
+            const response = await fetch(`${API_URL}/guilds`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return await response.json();
+        }
+
+        async function fetchVoiceData(guildId) {
+            const endpoint = guildId === 'all' 
+                ? `${API_URL}/voice-channels` 
+                : `${API_URL}/voice-channels/${guildId}`;
+            
+            const response = await fetch(endpoint);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return await response.json();
+        }
+
+        function renderGuildSelector(guildsData) {
+            const selector = document.getElementById('guildSelector');
+            guilds = guildsData.guilds;
+            
+            if (guilds.length === 0) {
+                selector.innerHTML = '<div class="empty-channel">No guilds found</div>';
+                return;
+            }
+
+            selector.innerHTML = '';
+
+            // Add "All Guilds" option if more than one guild
+            if (guilds.length > 1) {
+                const allTab = document.createElement('div');
+                allTab.className = 'guild-tab view-all-btn' + (selectedGuildId === 'all' ? ' active' : '');
+                allTab.innerHTML = '📊 All Guilds';
+                allTab.onclick = () => selectGuild('all');
+                selector.appendChild(allTab);
+            }
+
+            // Add individual guild tabs
+            guilds.forEach(guild => {
+                const tab = document.createElement('div');
+                tab.className = 'guild-tab' + (selectedGuildId === guild.id ? ' active' : '');
+                
+                const iconHTML = guild.icon 
+                    ? `<img src="${guild.icon}" alt="${guild.name}" class="guild-icon">`
+                    : `<div class="guild-icon-placeholder">${getInitials(guild.name)}</div>`;
+
+                tab.innerHTML = `
+                    ${iconHTML}
+                    <div class="guild-info">
+                        <div>${guild.name}</div>
+                        <div class="guild-members">${guild.voiceMemberCount} in voice</div>
+                    </div>
+                `;
+                tab.onclick = () => selectGuild(guild.id);
+                selector.appendChild(tab);
+            });
+
+            // Auto-select first guild if none selected
+            if (!selectedGuildId && guilds.length > 0) {
+                selectedGuildId = guilds.length > 1 ? 'all' : guilds[0].id;
+            }
+        }
+
+        function selectGuild(guildId) {
+            selectedGuildId = guildId;
+            renderGuildSelector({ guilds });
+            loadVoiceData(guildId);
+        }
+
+        async function loadVoiceData(guildId) {
+            try {
+                const data = await fetchVoiceData(guildId);
+                renderChannels(data);
+            } catch (error) {
+                console.error('Error loading voice data:', error);
+                showError('Unable to load voice data for the selected guild.');
+            }
+        }
+
+        function renderChannels(data) {
+            const container = document.getElementById('channelsContainer');
+            
+            let allChannels = [];
+            let guildNames = [];
+
+            // Handle both single guild and multiple guilds response
+            if (data.guilds) {
+                // Multiple guilds (all guilds view)
+                data.guilds.forEach(guild => {
+                    guild.channels.forEach(channel => {
+                        allChannels.push({
+                            ...channel,
+                            guildName: guild.name,
+                            guildId: guild.id
+                        });
+                    });
+                    guildNames.push(guild.name);
+                });
+            } else if (data.channels) {
+                // Single guild
+                allChannels = data.channels.map(ch => ({
+                    ...ch,
+                    guildName: data.name,
+                    guildId: data.id
+                }));
+                guildNames = [data.name];
+            }
+
+            if (allChannels.length === 0) {
+                container.innerHTML = '<div class="loading">No voice channels found</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+
+            allChannels.forEach(channel => {
+                const card = document.createElement('div');
+                card.className = 'channel-card';
+
+                let membersHTML = '';
+                if (channel.members.length === 0) {
+                    membersHTML = '<div class="empty-channel">No one is here</div>';
+                } else {
+                    membersHTML = '<ul class="members-list">';
+                    channel.members.forEach(member => {
+                        const avatarHTML = member.avatar 
+                            ? `<img src="${member.avatar}" alt="${member.name}" class="avatar">`
+                            : `<div class="avatar-placeholder">${getInitials(member.displayName || member.name)}</div>`;
+
+                        membersHTML += `
+                            <li class="member-item">
+                                ${avatarHTML}
+                                <div class="member-info">
+                                    <div class="member-name">${member.displayName || member.name}</div>
+                                    <div class="status-indicator">
+                                        <span class="status-dot ${getStatusClass(member)}"></span>
+                                        ${getStatusText(member)}
+                                    </div>
+                                </div>
+                            </li>
+                        `;
+                    });
+                    membersHTML += '</ul>';
+                }
+
+                const guildLabel = selectedGuildId === 'all' 
+                    ? `<div style="font-size: 12px; color: #666; margin-bottom: 5px;">📁 ${channel.guildName}</div>` 
+                    : '';
+
+                card.innerHTML = `
+                    ${guildLabel}
+                    <div class="channel-header">
+                        <span class="channel-icon">🔊</span>
+                        <span class="channel-name">${channel.name}</span>
+                        <span class="member-count">${channel.members.length}</span>
+                    </div>
+                    ${membersHTML}
+                `;
+
+                container.appendChild(card);
+            });
+
+            // Update last update time
+            const now = new Date().toLocaleTimeString();
+            document.getElementById('lastUpdate').textContent = `Last updated: ${now}`;
+        }
+
+        async function refreshData() {
+            if (isRefreshing) return;
+            
+            isRefreshing = true;
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = '🔄 Refreshing...';
+
+            try {
+                const guildsData = await fetchGuilds();
+                renderGuildSelector(guildsData);
+                
+                if (selectedGuildId) {
+                    await loadVoiceData(selectedGuildId);
+                }
+                
+                updateStatus(true);
+                clearError();
+            } catch (error) {
+                updateStatus(false);
+                showError('Unable to connect to the backend server. Make sure it\'s running on ' + API_URL);
+                console.error('Refresh error:', error);
+            } finally {
+                isRefreshing = false;
+                btn.disabled = false;
+                btn.textContent = '🔄 Refresh';
+            }
+        }
+
+        // Initial load
+        refreshData();
+
+        // Auto-refresh every 10 seconds
+        setInterval(refreshData, 10000);
+    </script>
+</body>
+</html>
