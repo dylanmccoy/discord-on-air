@@ -377,8 +377,11 @@
     </div>
 
     <script>
-        // Configure your backend API URL here
-        const API_URL = 'http://localhost:3000/api';
+        // API URL - automatically uses the same origin or can be configured
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000/api'  // Development
+            : 'https://mutechecker.onrender.com/api';  // Production
+        
         let isRefreshing = false;
         let guilds = [];
         let selectedGuildId = 'all';
@@ -510,7 +513,6 @@
             const container = document.getElementById('channelsContainer');
             
             let allChannels = [];
-            let guildNames = [];
 
             // Handle both single guild and multiple guilds response
             if (data.guilds) {
@@ -523,7 +525,6 @@
                             guildId: guild.id
                         });
                     });
-                    guildNames.push(guild.name);
                 });
             } else if (data.channels) {
                 // Single guild
@@ -532,7 +533,6 @@
                     guildName: data.name,
                     guildId: data.id
                 }));
-                guildNames = [data.name];
             }
 
             if (allChannels.length === 0) {
@@ -614,7 +614,7 @@
                 clearError();
             } catch (error) {
                 updateStatus(false);
-                showError('Unable to connect to the backend server. Make sure it\'s running on ' + API_URL);
+                showError('Unable to connect to the backend server. Make sure it is running at ' + API_URL);
                 console.error('Refresh error:', error);
             } finally {
                 isRefreshing = false;

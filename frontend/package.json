@@ -1,0 +1,20 @@
+{
+  "name": "discord-voice-status-frontend",
+  "version": "1.0.0",
+  "description": "Frontend web server for Discord Voice Status Dashboard",
+  "main": "frontend-server.js",
+  "scripts": {
+    "start": "node frontend-server.js",
+    "dev": "nodemon frontend-server.js"
+  },
+  "keywords": ["discord", "voice", "status", "frontend"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
