@@ -1,5 +1,5 @@
 {
-  "name": "discord-voice-status-backend",
+  "name": "discord-on-air-backend",
   "version": "1.0.0",
   "description": "Backend server for Discord voice channel status dashboard",
   "main": "server.js",

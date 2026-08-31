@@ -24,9 +24,95 @@ const client = new Client({
 // Configuration - You can specify multiple guild IDs separated by commas
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_IDS = process.env.GUILD_IDS ? process.env.GUILD_IDS.split(',').map(id => id.trim()) : [];
+const TRACKED_USER_IDS = (process.env.TRACKED_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+const API_TOKEN = process.env.API_TOKEN || '';
 
 // Store for voice state data - one entry per guild
 const guildsData = new Map();
+
+// ---------------------------------------------------------------------------
+// Single-user status tracking (for a hardware "on air" light on e.g. a Pi)
+// ---------------------------------------------------------------------------
+// Two independent sources feed one derived state per user:
+//   - "bot": discord.js voiceStateUpdate events. Only populated while the user
+//            is connected to a *server* voice channel.
+//   - "rpc": POSTs to /api/ingest from a local Discord RPC helper running on the
+//            desktop. Knows the mute/deafen toggle even when NOT in a call.
+// An rpc snapshot wins while it is fresh (RPC_TTL_MS); otherwise the bot
+// snapshot is used; otherwise the user is reported "disconnected".
+const RPC_TTL_MS = 30_000;
+
+const botStates = new Map();       // userId -> snapshot
+const rpcStates = new Map();       // userId -> { snap, receivedAt }
+const lastPublished = new Map();   // userId -> snapshot (for change detection)
+const subscribers = new Map();     // userId -> Set<res> (open SSE responses)
+
+function isTracked(userId) {
+    return TRACKED_USER_IDS.length === 0 || TRACKED_USER_IDS.includes(userId);
+}
+
+// Collapse the raw flags into one canonical state string. Mute/deafen take
+// priority over connection so an rpc-sourced "muted while idle" still shows.
+function deriveState({ inVoice, muted, deafened, streaming }) {
+    if (deafened) return 'deafened';
+    if (muted) return 'muted';
+    if (streaming) return 'streaming';
+    if (inVoice) return 'connected';
+    return 'disconnected';
+}
+
+function makeSnapshot(userId, { inVoice, muted, deafened, streaming, source }) {
+    const flags = {
+        inVoice: !!inVoice,
+        muted: !!muted,
+        deafened: !!deafened,
+        streaming: !!streaming,
+    };
+    return { userId, state: deriveState(flags), ...flags, source, ts: new Date().toISOString() };
+}
+
+function snapshotFromVoiceState(userId, vs) {
+    return makeSnapshot(userId, {
+        inVoice: !!(vs && vs.channelId),
+        muted: !!(vs && (vs.mute || vs.selfMute)),
+        deafened: !!(vs && (vs.deaf || vs.selfDeaf)),
+        streaming: !!(vs && (vs.streaming || vs.selfVideo)),
+        source: 'bot',
+    });
+}
+
+function effectiveSnapshot(userId) {
+    const rpc = rpcStates.get(userId);
+    if (rpc && Date.now() - rpc.receivedAt < RPC_TTL_MS) return rpc.snap;
+    return botStates.get(userId) || makeSnapshot(userId, { source: 'none' });
+}
+
+// Recompute the effective state and, if the state string changed, fan it out
+// to every SSE subscriber for that user.
+function publish(userId) {
+    const snap = effectiveSnapshot(userId);
+    const prev = lastPublished.get(userId);
+    if (prev && prev.state === snap.state && prev.source === snap.source) return;
+    lastPublished.set(userId, snap);
+    const payload = `data: ${JSON.stringify(snap)}\n\n`;
+    for (const res of subscribers.get(userId) || []) res.write(payload);
+    console.log(`💡 ${userId} -> ${snap.state} (${snap.source})`);
+}
+
+// When an rpc snapshot goes stale we need to fall back to the bot snapshot even
+// though no event fired. Re-evaluate the known users periodically.
+setInterval(() => {
+    const ids = new Set([...TRACKED_USER_IDS, ...rpcStates.keys(), ...botStates.keys()]);
+    for (const id of ids) publish(id);
+}, RPC_TTL_MS / 2);
+
+// Simple shared-secret guard for the single-user endpoints. No-op if unset.
+function checkToken(req, res, next) {
+    if (!API_TOKEN) return next();
+    const supplied = req.query.token || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (supplied !== API_TOKEN) return res.status(401).json({ error: 'unauthorized' });
+    next();
+}
 
 // Discord bot ready event
 client.once('ready', () => {
@@ -50,6 +136,21 @@ client.once('ready', () => {
             }
         });
     }
+
+    // Seed single-user status from whatever voice state Discord already knows.
+    const seedIds = TRACKED_USER_IDS.length > 0 ? TRACKED_USER_IDS : [];
+    if (TRACKED_USER_IDS.length > 0) {
+        console.log(`🎯 Tracking status for user(s): ${TRACKED_USER_IDS.join(', ')}`);
+    }
+    for (const userId of seedIds) {
+        let vs = null;
+        for (const guild of client.guilds.cache.values()) {
+            vs = guild.voiceStates.cache.get(userId) || null;
+            if (vs) break;
+        }
+        botStates.set(userId, snapshotFromVoiceState(userId, vs));
+        publish(userId);
+    }
 });
 
 // Update voice data when someone joins/leaves/changes state
@@ -57,6 +158,14 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     // Update the guild where the state changed
     const guildId = newState.guild.id || oldState.guild.id;
     updateVoiceData(guildId);
+
+    // Feed the single-user tracker. newState has no channelId once the user
+    // leaves voice entirely - treat that as "not in voice".
+    const userId = newState.id;
+    if (isTracked(userId)) {
+        botStates.set(userId, snapshotFromVoiceState(userId, newState.channelId ? newState : null));
+        publish(userId);
+    }
 });
 
 // Function to get voice channel data for a specific guild
@@ -227,6 +336,54 @@ app.get('/api/health', (req, res) => {
             return guild ? { id, name: guild.name } : { id, name: 'Unknown' };
         })
     });
+});
+
+// ---------------------------------------------------------------------------
+// Single-user status API (hardware "on air" light)
+// ---------------------------------------------------------------------------
+
+// One-shot compact status for a user. Handy for polling / debugging.
+app.get('/api/status/:userId', checkToken, (req, res) => {
+    res.json(effectiveSnapshot(req.params.userId));
+});
+
+// Server-Sent Events stream: emits the current snapshot immediately, then a new
+// snapshot every time the derived state changes. Clients (the Pi) just keep the
+// connection open and reconnect on drop.
+app.get('/api/stream/:userId', checkToken, (req, res) => {
+    const { userId } = req.params;
+
+    res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+    res.write(`data: ${JSON.stringify(effectiveSnapshot(userId))}\n\n`);
+
+    if (!subscribers.has(userId)) subscribers.set(userId, new Set());
+    subscribers.get(userId).add(res);
+
+    const heartbeat = setInterval(() => res.write(': ping\n\n'), 15_000);
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        subscribers.get(userId)?.delete(res);
+    });
+});
+
+// Ingest authoritative state from a local Discord RPC helper on the desktop.
+// Body: { inVoice?, muted?, deafened?, streaming? }. This is the only way to
+// know the mute toggle while NOT connected to a voice channel.
+app.post('/api/ingest/:userId', checkToken, (req, res) => {
+    const { userId } = req.params;
+    const { inVoice, muted, deafened, streaming } = req.body || {};
+    rpcStates.set(userId, {
+        snap: makeSnapshot(userId, { inVoice, muted, deafened, streaming, source: 'rpc' }),
+        receivedAt: Date.now(),
+    });
+    publish(userId);
+    res.json({ ok: true });
 });
 
 // Start server

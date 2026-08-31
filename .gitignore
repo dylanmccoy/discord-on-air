@@ -1,4 +1,17 @@
+# dependencies
 node_modules/
+
+# secrets / local config
 .env
+.env.*
+!.env.example
+.token.json
+
+# os / logs
 .DS_Store
 *.log
+
+# python
+__pycache__/
+*.pyc
+.venv/

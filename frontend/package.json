@@ -1,5 +1,5 @@
 {
-  "name": "discord-voice-status-frontend",
+  "name": "discord-on-air-frontend",
   "version": "1.0.0",
   "description": "Frontend web server for Discord Voice Status Dashboard",
   "main": "frontend-server.js",

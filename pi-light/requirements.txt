@@ -1,0 +1,4 @@
+# Raspberry Pi OS Bookworm ships gpiozero + the lgpio backend already.
+# If importing gpiozero fails, install:
+#   sudo apt install python3-gpiozero python3-lgpio
+gpiozero>=2.0

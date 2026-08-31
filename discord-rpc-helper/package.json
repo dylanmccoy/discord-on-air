@@ -1,0 +1,16 @@
+{
+  "name": "discord-rpc-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bridges local Discord RPC voice state (incl. mute toggle while not in a call) to the discord-on-air backend or pi-light",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  }
+}
