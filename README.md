@@ -21,6 +21,7 @@ Discord voice-channel status — as a real-time web dashboard, and/or as a physi
 | `frontend/` | Static web dashboard server |
 | `discord-rpc-helper/` | **PC-side** bridge: reads your mute/deafen toggle from the local Discord desktop client over its RPC socket and POSTs it out |
 | `pi-light/` | **Raspberry Pi-side** HTTP → RGB LED server |
+| `esp32-light/` | **ESP32-S2-side** MicroPython HTTP server → onboard WS2812 LED (same protocol as `pi-light`, over Wi-Fi) |
 
 Two independent ways to use it:
 
@@ -33,6 +34,11 @@ Two independent ways to use it:
 
 Use this when the light only needs to work while your PC is on. The chain is
 **PC → Pi → LED** and nothing else is involved.
+
+> **On an ESP32-S2 instead of a Pi?** See [`esp32-light/`](esp32-light/) — a
+> MicroPython port of `pi-light` that drives the board's onboard RGB LED over
+> Wi-Fi. The PC side is unchanged; just set
+> `INGEST_URL=http://<esp-ip>:8000/` in the helper's `.env`.
 
 ### Why RPC and not the bot
 
