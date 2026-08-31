@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Layout
 
-The repo root is `discord-on-air/` (formerly a nested `MuteChecker/` folder — flattened, git history preserved). It holds four **independent** packages that are developed, deployed, and run separately:
+The repo root is `discord-on-air/` (formerly a nested `MuteChecker/` folder — flattened, git history preserved). It holds five **independent** packages that are developed, deployed, and run separately:
 
 - `backend/` — a Discord bot (discord.js v14) plus an Express REST API that exposes voice-channel state, and a single-user status API (`/api/status`, `/api/stream`, `/api/ingest`) for driving a hardware "on air" light.
 - `frontend/` — a bare Express static-file server for the dashboard UI.
 - `discord-rpc-helper/` — desktop-side bridge (Node ≥18, only dep is `dotenv`). Talks to the local Discord client over its RPC/IPC socket and POSTs `{inVoice,muted,deafened,streaming}` state. This is the only way to know the mute toggle while **not** connected to a voice channel. Targets either the backend's `/api/ingest/:userId` (`BACKEND_URL`) or, in "direct mode", an arbitrary URL (`INGEST_URL`) such as `pi-light`. Sends a heartbeat every 10s and a clear-state POST on clean exit.
 - `pi-light/` — Raspberry Pi listener (`light_server.py`, stdlib + `gpiozero`). Receives the helper's POSTs and drives an RGB LED; a watchdog blanks the LED after `STALE_AFTER` seconds with no update. This is the whole device side for the "light only matters while my PC is on" setup — no bot/backend needed on that path.
+- `esp32-light/` — ESP32-S2 (Saola-1R) equivalent of `pi-light`, in MicroPython (`light_server.py` + `main.py`, stdlib + `neopixel`). Runs a hand-rolled socket HTTP server on Wi-Fi, drives the board's onboard WS2812 pixel, same `derive()`/colour map and same stale watchdog (`STALE_AFTER_MS`, inline in the accept loop). Same wire protocol as `pi-light`, so `discord-rpc-helper` is unchanged — only `INGEST_URL` differs. Config is `config.py` (gitignored; copy `config.example.py`), not `.env`.
 
-There is no root package, no workspace tooling, no build step, and no test suite. Each package is installed and run on its own (`npm install` for the three Node ones; `pi-light` is stdlib Python + `gpiozero`).
+There is no root package, no workspace tooling, no build step, and no test suite. Each package is installed and run on its own (`npm install` for the three Node ones; `pi-light` is stdlib Python + `gpiozero`; `esp32-light` is MicroPython flashed to the board, pushed with `mpremote`).
 
 ## Commands
 
