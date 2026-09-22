@@ -13,7 +13,7 @@ Wants=network-online.target
 User=dylan
 WorkingDirectory=/home/dylan/discord-on-air/pi-light
 EnvironmentFile=/home/dylan/discord-on-air/pi-light/.env
-ExecStart=/usr/bin/python3 light_server.py
+ExecStart=/home/dylan/.local/bin/uv run --project /home/dylan/discord-on-air/pi-light light_server.py
 Restart=always
 RestartSec=3
 

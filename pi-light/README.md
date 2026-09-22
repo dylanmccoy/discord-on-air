@@ -30,15 +30,23 @@ Common-cathode RGB LED: each colour leg → a 220–330 Ω resistor → a GPIO p
 common leg → GND. Defaults are BCM **17 / 27 / 22** for R / G / B. For a
 common-anode LED, tie the common leg to 3V3 and set `LED_ACTIVE_HIGH=0`.
 
+Raspberry Pi OS Bookworm ships gpiozero + the lgpio backend already. If `uv run`
+fails to import gpiozero's lgpio backend, install the system libs and drop
+`system-site-packages = true` under `[tool.uv]` in `pyproject.toml`:
+
+```bash
+sudo apt install python3-gpiozero python3-lgpio
+```
+
 ## Run
 
 ```bash
 cd discord-on-air/pi-light
-python3 -m venv .venv && . .venv/bin/activate      # optional
-pip install -r requirements.txt                    # usually already present on Pi OS
-cp .env.example .env                                # set API_TOKEN, pins
+curl -LsSf https://astral.sh/uv/install.sh | sh      # one-time, if uv isn't installed
+uv sync                                                # creates .venv, installs gpiozero
+cp .env.example .env                                   # set API_TOKEN, pins
 set -a; . ./.env; set +a
-python3 light_server.py
+uv run light_server.py
 ```
 
 As a service: edit paths/`User` in `pi-light.service`, then
